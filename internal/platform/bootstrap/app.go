@@ -49,6 +49,12 @@ func (a *App) Run(ctx context.Context) error {
 			return fmt.Errorf("shutdown application: %w", err)
 		}
 
+		if a.Infra.DB != nil {
+			if err := a.Infra.DB.Close(); err != nil {
+				return fmt.Errorf("close database: %w", err)
+			}
+		}
+
 		a.Infra.Logger.Info("Goldin API stopped")
 
 		return nil

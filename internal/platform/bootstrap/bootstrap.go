@@ -1,9 +1,12 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/pouya-mhb/Goldin-Go/internal/platform/config"
+	"github.com/pouya-mhb/Goldin-Go/internal/platform/database"
 	platformhttp "github.com/pouya-mhb/Goldin-Go/internal/platform/http"
 	"github.com/pouya-mhb/Goldin-Go/internal/platform/logger"
 )
@@ -16,6 +19,15 @@ func Build() (*App, error) {
 	}
 
 	log := logger.New(cfg)
+
+	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	db, err := database.OpenMySQL(dbCtx, cfg.Database)
+	if err != nil {
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+
 	router := platformhttp.NewRouter(log)
 	httpServer := platformhttp.New(cfg.Server, log, router)
 
@@ -23,6 +35,7 @@ func Build() (*App, error) {
 		Config: cfg,
 		Infra: &Infrastructure{
 			Logger: log,
+			DB:     db,
 			HTTP:   httpServer,
 		},
 	}
