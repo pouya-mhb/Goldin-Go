@@ -1,10 +1,14 @@
 package bootstrap
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/pouya-mhb/Goldin-Go/internal/platform/config"
+	platformhttp "github.com/pouya-mhb/Goldin-Go/internal/platform/http"
 )
 
 // App contains the application's infrastructure dependencies.
@@ -21,8 +25,38 @@ type App struct {
 type Infrastructure struct {
 	Logger *slog.Logger
 	DB     *sql.DB
+	HTTP   *platformhttp.Server
 
 	// Redis  *redis.Client
 	// Kafka  *kafka.Writer
 	// Tracer trace.TracerProvider
+}
+
+// Run starts the application and blocks until the context is canceled.
+func (a *App) Run(ctx context.Context) error {
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- a.Infra.HTTP.Start()
+	}()
+
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := a.Infra.HTTP.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shutdown application: %w", err)
+		}
+
+		a.Infra.Logger.Info("Goldin API stopped")
+
+		return nil
+	case err := <-errCh:
+		if err != nil {
+			return fmt.Errorf("run application: %w", err)
+		}
+
+		return nil
+	}
 }

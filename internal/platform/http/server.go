@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	nethttp "net/http"
 	"time"
@@ -13,8 +14,10 @@ import (
 
 type Server struct {
 	http *nethttp.Server
+	log  *slog.Logger
 }
 
+// New constructs an HTTP server.
 func New(cfg config.ServerConfig, logger *slog.Logger, handler nethttp.Handler) *Server {
 	server := &nethttp.Server{
 		Addr:              fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
@@ -27,13 +30,31 @@ func New(cfg config.ServerConfig, logger *slog.Logger, handler nethttp.Handler) 
 
 	return &Server{
 		http: server,
+		log:  logger,
 	}
 }
 
-func (s *Server) Start() error {
-	return s.http.ListenAndServe()
+// Addr returns the configured server listen address.
+func (s *Server) Addr() string {
+	return s.http.Addr
 }
 
+// Start starts the HTTP server.
+func (s *Server) Start() error {
+	s.log.Info("starting HTTP server", slog.String("address", s.http.Addr))
+
+	if err := s.http.ListenAndServe(); err != nil && !errors.Is(err, nethttp.ErrServerClosed) {
+		return fmt.Errorf("listen and serve HTTP: %w", err)
+	}
+
+	return nil
+}
+
+// Shutdown gracefully stops the HTTP server.
 func (s *Server) Shutdown(ctx context.Context) error {
-	return s.http.Shutdown(ctx)
+	if err := s.http.Shutdown(ctx); err != nil {
+		return fmt.Errorf("shutdown HTTP server: %w", err)
+	}
+
+	return nil
 }
