@@ -1,6 +1,8 @@
 .gitignore
 .gocache/
 *.go.[0-9]*
+*.md
+README.md
 
 # Binaries
 bin/
