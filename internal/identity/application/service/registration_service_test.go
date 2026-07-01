@@ -193,6 +193,14 @@ func (r *fakeUserRepository) ExistsByEmail(ctx context.Context, email valueobjec
 	return r.exists, r.existsErr
 }
 
+func (r *fakeUserRepository) FindByEmail(ctx context.Context, email valueobject.Email) (*domain.User, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	return nil, errors.New("not implemented by registration test fake")
+}
+
 func (r *fakeUserRepository) Save(ctx context.Context, user *domain.User) error {
 	if err := ctx.Err(); err != nil {
 		return err

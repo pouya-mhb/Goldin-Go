@@ -10,5 +10,6 @@ import (
 // UserRepository persists and retrieves identity users.
 type UserRepository interface {
 	ExistsByEmail(ctx context.Context, email valueobject.Email) (bool, error)
+	FindByEmail(ctx context.Context, email valueobject.Email) (*domain.User, error)
 	Save(ctx context.Context, user *domain.User) error
 }
