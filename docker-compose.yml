@@ -4,14 +4,14 @@ services:
     container_name: goldin-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: admin
-      MYSQL_DATABASE: goldin
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-goldin}
     ports:
-      - "3306:3306"
+      - "${MYSQL_HOST_PORT:-3307}:3306"
     volumes:
       - goldin_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent" ]
       interval: 10s
       timeout: 5s
       retries: 10
