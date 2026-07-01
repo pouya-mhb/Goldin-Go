@@ -22,6 +22,10 @@ input {
   font: inherit;
 }
 
+button {
+  letter-spacing: 0;
+}
+
 .shell {
   min-height: 100vh;
   padding: 24px;
@@ -86,13 +90,17 @@ input {
 
 .navItem {
   min-height: 42px;
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
+  border: 0;
   color: #dbe5df;
-  text-decoration: none;
+  background: transparent;
+  cursor: pointer;
   border-radius: 8px;
+  text-align: left;
 }
 
 .navItem.active {
@@ -115,6 +123,12 @@ input {
   gap: 16px;
   align-items: center;
   margin-bottom: 24px;
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .eyebrow {
@@ -140,7 +154,9 @@ h2 {
 }
 
 .statusButton,
-.primaryButton {
+.primaryButton,
+.secondaryButton,
+.ghostButton {
   min-height: 42px;
   display: inline-flex;
   align-items: center;
@@ -156,6 +172,13 @@ h2 {
   padding: 0 14px;
   color: #1b2a21;
   background: #edf2ee;
+  border: 1px solid #cad8cf;
+}
+
+.ghostButton {
+  padding: 0 14px;
+  color: #294236;
+  background: #ffffff;
   border: 1px solid #cad8cf;
 }
 
@@ -175,11 +198,119 @@ h2 {
   gap: 20px;
 }
 
+.pageStack {
+  display: grid;
+  gap: 20px;
+}
+
+.marketHero {
+  min-height: 190px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px;
+  border-radius: 8px;
+  color: #ffffff;
+  background:
+    linear-gradient(90deg, rgba(20, 35, 28, 0.88), rgba(20, 35, 28, 0.28)),
+    url("https://images.unsplash.com/photo-1610375461246-83df859d849d?auto=format&fit=crop&w=1600&q=80");
+  background-size: cover;
+  background-position: center;
+}
+
+.marketHero h2 {
+  max-width: 720px;
+  font-size: 2rem;
+}
+
+.marketHero .eyebrow {
+  color: #e7d59d;
+}
+
+.heroMetric,
+.metricCard {
+  border: 1px solid rgba(203, 216, 208, 0.8);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #17211b;
+}
+
+.heroMetric {
+  min-width: 180px;
+  padding: 14px;
+}
+
+.heroMetric span,
+.metricCard span,
+.quoteBoard span {
+  display: block;
+  color: #63746a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.heroMetric strong,
+.metricCard strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.05rem;
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metricCard {
+  min-height: 112px;
+  display: grid;
+  align-content: space-between;
+  padding: 16px;
+}
+
+.metricCard.online {
+  border-color: #b8dfc5;
+  background: #eefaf2;
+}
+
+.metricCard.offline {
+  border-color: #efc5bd;
+  background: #fff3f0;
+}
+
+.tradeGrid,
+.accountGrid {
+  align-items: start;
+}
+
 .panel {
   border: 1px solid #d9e2dc;
   border-radius: 8px;
   background: #ffffff;
   padding: 20px;
+}
+
+.quoteBoard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.quoteBoard div {
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid #d9e2dc;
+  border-radius: 8px;
+  background: #fbfdfb;
+}
+
+.quoteBoard strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.4rem;
 }
 
 .panelHeader {
@@ -256,6 +387,25 @@ input:focus {
   background: #1d5f3c;
 }
 
+.secondaryButton {
+  padding: 0 14px;
+  color: #2c4638;
+  background: #eef4f0;
+  border: 1px solid #cad8cf;
+}
+
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  color: #7f9087;
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
 .primaryButton:disabled {
   cursor: not-allowed;
   background: #9aaba1;
@@ -263,6 +413,15 @@ input:focus {
 
 .detailPanel {
   min-height: 318px;
+}
+
+.walletPanel {
+  min-height: 220px;
+}
+
+.walletValue {
+  display: block;
+  font-size: 2rem;
 }
 
 .result {
@@ -318,6 +477,19 @@ dd {
   border-radius: 8px;
 }
 
+.emptyState.compact {
+  min-height: 160px;
+}
+
+.accessPrompt {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
 .spin {
   animation: spin 0.8s linear infinite;
 }
@@ -361,8 +533,29 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .metricsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .topbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .topActions,
+  .marketHero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 560px) {
+  .metricsGrid,
+  .quoteBoard {
+    grid-template-columns: 1fr;
+  }
+
+  .marketHero h2 {
+    font-size: 1.45rem;
   }
 }
