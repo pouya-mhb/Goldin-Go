@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pouya-mhb/Goldin-Go/internal/identity"
+	identityhttp "github.com/pouya-mhb/Goldin-Go/internal/identity/adapters/http"
 	"github.com/pouya-mhb/Goldin-Go/internal/platform/config"
 	"github.com/pouya-mhb/Goldin-Go/internal/platform/database"
 	platformhttp "github.com/pouya-mhb/Goldin-Go/internal/platform/http"
@@ -34,7 +35,10 @@ func Build() (*App, error) {
 		return nil, fmt.Errorf("build identity module: %w", err)
 	}
 
-	router := platformhttp.NewRouter(log)
+	router := platformhttp.NewRouter(
+		log,
+		identityhttp.WithRoutes(identityModule.RegisterUser),
+	)
 	httpServer := platformhttp.New(cfg.Server, log, router)
 
 	app := &App{
