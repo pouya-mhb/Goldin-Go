@@ -2,6 +2,7 @@ package token
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,12 +14,80 @@ import (
 
 const bearerTokenType = "Bearer"
 
+var (
+	// ErrInvalidToken is returned when a token cannot be trusted.
+	ErrInvalidToken = errors.New("invalid token")
+)
+
+// VerifiedToken contains identity claims extracted from a trusted token.
+type VerifiedToken struct {
+	UserID valueobject.UserID
+	Email  valueobject.Email
+}
+
 // JWTIssuer issues signed JWT access and refresh tokens.
 type JWTIssuer struct {
 	secret          []byte
 	accessDuration  time.Duration
 	refreshDuration time.Duration
 	clock           func() time.Time
+}
+
+// VerifyAccessToken verifies an access token and extracts identity claims.
+func (i *JWTIssuer) VerifyAccessToken(ctx context.Context, tokenValue string) (VerifiedToken, error) {
+	if err := ctx.Err(); err != nil {
+		return VerifiedToken{}, fmt.Errorf("verify token context: %w", err)
+	}
+
+	claims := jwt.MapClaims{}
+	parsedToken, err := jwt.ParseWithClaims(tokenValue, claims, func(token *jwt.Token) (any, error) {
+		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, ErrInvalidToken
+		}
+
+		return i.secret, nil
+	})
+	if err != nil {
+		return VerifiedToken{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
+
+	if !parsedToken.Valid {
+		return VerifiedToken{}, ErrInvalidToken
+	}
+
+	tokenUse, ok := claims["token_use"].(string)
+	if !ok || tokenUse != "access" {
+		return VerifiedToken{}, ErrInvalidToken
+	}
+
+	subject, ok := claims["sub"].(string)
+	if !ok {
+		return VerifiedToken{}, ErrInvalidToken
+	}
+
+	userID, err := valueobject.ParseUserID(subject)
+	if err != nil {
+		return VerifiedToken{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
+
+	emailClaim, ok := claims["email"].(string)
+	if !ok {
+		return VerifiedToken{}, ErrInvalidToken
+	}
+
+	email, err := valueobject.NewEmail(emailClaim)
+	if err != nil {
+		return VerifiedToken{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return VerifiedToken{}, fmt.Errorf("verify token context: %w", err)
+	}
+
+	return VerifiedToken{
+		UserID: userID,
+		Email:  email,
+	}, nil
 }
 
 // NewJWTIssuer constructs a JWTIssuer.

@@ -74,6 +74,94 @@ func TestJWTIssuerIssueTokensHonorsCanceledContext(t *testing.T) {
 	}
 }
 
+func TestJWTIssuerVerifyAccessToken(t *testing.T) {
+	t.Parallel()
+
+	issuer := token.NewJWTIssuer(config.JWTConfig{
+		Secret:                      "local-development-secret-value-32chars",
+		AccessTokenDurationMinutes:  15,
+		RefreshTokenDurationMinutes: 43200,
+	})
+
+	userID := valueobject.NewUserID()
+	email := mustEmail(t)
+
+	tokens, err := issuer.IssueTokens(context.Background(), userID, email)
+	if err != nil {
+		t.Fatalf("issue tokens: %v", err)
+	}
+
+	verifiedToken, err := issuer.VerifyAccessToken(context.Background(), tokens.AccessToken)
+	if err != nil {
+		t.Fatalf("verify access token: %v", err)
+	}
+
+	if verifiedToken.UserID != userID {
+		t.Fatal("expected verified user id to match")
+	}
+
+	if verifiedToken.Email != email {
+		t.Fatal("expected verified email to match")
+	}
+}
+
+func TestJWTIssuerVerifyAccessTokenFailures(t *testing.T) {
+	t.Parallel()
+
+	issuer := token.NewJWTIssuer(config.JWTConfig{
+		Secret:                      "local-development-secret-value-32chars",
+		AccessTokenDurationMinutes:  15,
+		RefreshTokenDurationMinutes: 43200,
+	})
+
+	refreshTokens, err := issuer.IssueTokens(context.Background(), valueobject.NewUserID(), mustEmail(t))
+	if err != nil {
+		t.Fatalf("issue tokens: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		ctx        context.Context
+		tokenValue string
+		wantErr    error
+	}{
+		{
+			name:       "malformed token",
+			ctx:        context.Background(),
+			tokenValue: "not-a-token",
+			wantErr:    token.ErrInvalidToken,
+		},
+		{
+			name:       "refresh token rejected",
+			ctx:        context.Background(),
+			tokenValue: refreshTokens.RefreshToken,
+			wantErr:    token.ErrInvalidToken,
+		},
+		{
+			name:       "canceled context",
+			ctx:        canceledContext(),
+			tokenValue: refreshTokens.AccessToken,
+			wantErr:    context.Canceled,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			verifiedToken, err := issuer.VerifyAccessToken(tt.ctx, tt.tokenValue)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+			}
+
+			if !verifiedToken.UserID.IsZero() {
+				t.Fatal("expected zero verified token")
+			}
+		})
+	}
+}
+
 func assertTokenClaims(t *testing.T, tokenValue string, secret string, userID string, email string, tokenUse string) {
 	t.Helper()
 
@@ -111,4 +199,11 @@ func mustEmail(t *testing.T) valueobject.Email {
 	}
 
 	return email
+}
+
+func canceledContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	return ctx
 }
