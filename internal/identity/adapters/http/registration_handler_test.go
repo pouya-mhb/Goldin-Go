@@ -139,6 +139,117 @@ func TestRegistrationHandlerRegisterFailures(t *testing.T) {
 	}
 }
 
+func TestLoginHandlerLogin(t *testing.T) {
+	t.Parallel()
+
+	useCase := &fakeLoginUser{
+		result: result.LoginUser{
+			UserID:                "21f3483a-176e-40e4-9d77-6d15fcb675d8",
+			Email:                 "user@example.com",
+			AccessToken:           "access-token",
+			RefreshToken:          "refresh-token",
+			TokenType:             "Bearer",
+			AccessTokenExpiresIn:  900,
+			RefreshTokenExpiresIn: 2592000,
+		},
+	}
+	handler := identityhttp.NewLoginHandler(useCase)
+
+	request := httptest.NewRequest(nethttp.MethodPost, "/identity/login", bytes.NewBufferString(`{"email":"user@example.com","password":"correct horse battery staple"}`))
+	response := httptest.NewRecorder()
+
+	handler.Login(response, request)
+
+	if response.Code != nethttp.StatusOK {
+		t.Fatalf("expected status %d, got %d", nethttp.StatusOK, response.Code)
+	}
+
+	if useCase.command.Email != "user@example.com" {
+		t.Fatalf("expected email to be passed to use case, got %q", useCase.command.Email)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if body["access_token"] != useCase.result.AccessToken {
+		t.Fatal("expected access token in response")
+	}
+
+	if body["refresh_token"] != useCase.result.RefreshToken {
+		t.Fatal("expected refresh token in response")
+	}
+
+	if body["token_type"] != "Bearer" {
+		t.Fatalf("expected token type Bearer, got %v", body["token_type"])
+	}
+}
+
+func TestLoginHandlerLoginFailures(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		body       string
+		err        error
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "malformed json",
+			body:       `{`,
+			wantStatus: nethttp.StatusBadRequest,
+			wantCode:   "invalid_request",
+		},
+		{
+			name:       "unknown field",
+			body:       `{"email":"user@example.com","password":"correct horse battery staple","role":"admin"}`,
+			wantStatus: nethttp.StatusBadRequest,
+			wantCode:   "invalid_request",
+		},
+		{
+			name:       "invalid credentials",
+			body:       `{"email":"user@example.com","password":"wrong password"}`,
+			err:        service.ErrInvalidCredentials,
+			wantStatus: nethttp.StatusUnauthorized,
+			wantCode:   "invalid_credentials",
+		},
+		{
+			name:       "unexpected failure",
+			body:       `{"email":"user@example.com","password":"correct horse battery staple"}`,
+			err:        errors.New("token issuer unavailable"),
+			wantStatus: nethttp.StatusInternalServerError,
+			wantCode:   "internal_error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			handler := identityhttp.NewLoginHandler(&fakeLoginUser{err: tt.err})
+			request := httptest.NewRequest(nethttp.MethodPost, "/identity/login", bytes.NewBufferString(tt.body))
+			response := httptest.NewRecorder()
+
+			handler.Login(response, request)
+
+			if response.Code != tt.wantStatus {
+				t.Fatalf("expected status %d, got %d", tt.wantStatus, response.Code)
+			}
+
+			var body map[string]string
+			if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+
+			if body["error"] != tt.wantCode {
+				t.Fatalf("expected error code %q, got %q", tt.wantCode, body["error"])
+			}
+		})
+	}
+}
+
 type fakeRegisterUser struct {
 	command command.RegisterUser
 	result  result.RegisterUser
@@ -148,6 +259,22 @@ type fakeRegisterUser struct {
 func (f *fakeRegisterUser) RegisterUser(ctx context.Context, cmd command.RegisterUser) (result.RegisterUser, error) {
 	if err := ctx.Err(); err != nil {
 		return result.RegisterUser{}, err
+	}
+
+	f.command = cmd
+
+	return f.result, f.err
+}
+
+type fakeLoginUser struct {
+	command command.LoginUser
+	result  result.LoginUser
+	err     error
+}
+
+func (f *fakeLoginUser) LoginUser(ctx context.Context, cmd command.LoginUser) (result.LoginUser, error) {
+	if err := ctx.Err(); err != nil {
+		return result.LoginUser{}, err
 	}
 
 	f.command = cmd

@@ -37,7 +37,7 @@ func Build() (*App, error) {
 
 	router := platformhttp.NewRouter(
 		log,
-		identityhttp.WithRoutes(identityModule.RegisterUser),
+		identityhttp.WithRoutes(identityModule.RegisterUser, identityModule.LoginUser),
 	)
 	httpServer := platformhttp.New(cfg.Server, log, router)
 

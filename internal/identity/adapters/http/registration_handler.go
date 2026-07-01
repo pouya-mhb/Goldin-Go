@@ -17,12 +17,14 @@ import (
 const maxRegistrationRequestBytes int64 = 1 << 20
 
 // WithRoutes registers Identity HTTP routes.
-func WithRoutes(registerUser inbound.RegisterUser) func(chi.Router) {
-	handler := NewRegistrationHandler(registerUser)
+func WithRoutes(registerUser inbound.RegisterUser, loginUser inbound.LoginUser) func(chi.Router) {
+	registrationHandler := NewRegistrationHandler(registerUser)
+	loginHandler := NewLoginHandler(loginUser)
 
 	return func(r chi.Router) {
 		r.Route("/identity", func(r chi.Router) {
-			r.Post("/register", handler.Register)
+			r.Post("/register", registrationHandler.Register)
+			r.Post("/login", loginHandler.Login)
 		})
 	}
 }
@@ -106,6 +108,72 @@ func writeRegistrationError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "email_already_registered", "email is already registered")
 	default:
 		writeError(w, http.StatusInternalServerError, "internal_error", "registration failed")
+	}
+}
+
+// LoginHandler handles Identity login HTTP requests.
+type LoginHandler struct {
+	loginUser inbound.LoginUser
+}
+
+// NewLoginHandler constructs a LoginHandler.
+func NewLoginHandler(loginUser inbound.LoginUser) *LoginHandler {
+	return &LoginHandler{loginUser: loginUser}
+}
+
+// Login handles POST /identity/login.
+func (h *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
+	var request loginUserRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "request body must be valid JSON")
+		return
+	}
+
+	loggedInUser, err := h.loginUser.LoginUser(r.Context(), command.LoginUser{
+		Email:    request.Email,
+		Password: request.Password,
+	})
+	if err != nil {
+		writeLoginError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, loginUserResponseFromResult(loggedInUser))
+}
+
+type loginUserRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type loginUserResponse struct {
+	UserID                string `json:"user_id"`
+	Email                 string `json:"email"`
+	AccessToken           string `json:"access_token"`
+	RefreshToken          string `json:"refresh_token"`
+	TokenType             string `json:"token_type"`
+	AccessTokenExpiresIn  int64  `json:"access_token_expires_in"`
+	RefreshTokenExpiresIn int64  `json:"refresh_token_expires_in"`
+}
+
+func loginUserResponseFromResult(loggedInUser result.LoginUser) loginUserResponse {
+	return loginUserResponse{
+		UserID:                loggedInUser.UserID,
+		Email:                 loggedInUser.Email,
+		AccessToken:           loggedInUser.AccessToken,
+		RefreshToken:          loggedInUser.RefreshToken,
+		TokenType:             loggedInUser.TokenType,
+		AccessTokenExpiresIn:  loggedInUser.AccessTokenExpiresIn,
+		RefreshTokenExpiresIn: loggedInUser.RefreshTokenExpiresIn,
+	}
+}
+
+func writeLoginError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, service.ErrInvalidCredentials):
+		writeError(w, http.StatusUnauthorized, "invalid_credentials", "email or password is invalid")
+	default:
+		writeError(w, http.StatusInternalServerError, "internal_error", "login failed")
 	}
 }
 
