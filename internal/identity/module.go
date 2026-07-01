@@ -15,6 +15,7 @@ const defaultBcryptCost = bcrypt.DefaultCost
 
 // Module contains the Identity bounded context dependencies.
 type Module struct {
+	LoginUser    inbound.LoginUser
 	RegisterUser inbound.RegisterUser
 }
 
@@ -28,8 +29,10 @@ func NewModule(db *sql.DB) (*Module, error) {
 	}
 
 	registration := service.NewRegistrationService(userRepository, passwordHasher)
+	login := service.NewLoginService(userRepository, passwordHasher)
 
 	return &Module{
+		LoginUser:    login,
 		RegisterUser: registration,
 	}, nil
 }

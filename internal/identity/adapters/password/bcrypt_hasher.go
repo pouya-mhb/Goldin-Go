@@ -2,9 +2,16 @@ package password
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/pouya-mhb/Goldin-Go/internal/identity/domain/valueobject"
 	"golang.org/x/crypto/bcrypt"
+)
+
+var (
+	// ErrPasswordMismatch is returned when a password does not match a hash.
+	ErrPasswordMismatch = errors.New("password mismatch")
 )
 
 // BcryptHasher hashes passwords with bcrypt.
@@ -37,4 +44,21 @@ func (h *BcryptHasher) HashPassword(ctx context.Context, plaintext string) (stri
 	}
 
 	return string(hash), nil
+}
+
+// VerifyPassword verifies a plaintext password against a stored hash.
+func (h *BcryptHasher) VerifyPassword(ctx context.Context, plaintext string, hash valueobject.PasswordHash) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("verify password context: %w", err)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(hash.String()), []byte(plaintext)); err != nil {
+		return ErrPasswordMismatch
+	}
+
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("verify password context: %w", err)
+	}
+
+	return nil
 }

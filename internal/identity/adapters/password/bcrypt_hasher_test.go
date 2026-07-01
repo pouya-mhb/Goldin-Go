@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/pouya-mhb/Goldin-Go/internal/identity/adapters/password"
+	"github.com/pouya-mhb/Goldin-Go/internal/identity/domain/valueobject"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -104,4 +105,85 @@ func TestBcryptHasherHashPasswordHonorsCanceledContext(t *testing.T) {
 	if hash != "" {
 		t.Fatalf("expected empty hash, got %q", hash)
 	}
+}
+
+func TestBcryptHasherVerifyPassword(t *testing.T) {
+	t.Parallel()
+
+	hasher, err := password.NewBcryptHasher(bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("create hasher: %v", err)
+	}
+
+	hashValue, err := hasher.HashPassword(context.Background(), "correct horse battery staple")
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+
+	hash, err := valueobject.NewPasswordHash(hashValue)
+	if err != nil {
+		t.Fatalf("create password hash: %v", err)
+	}
+
+	if err := hasher.VerifyPassword(context.Background(), "correct horse battery staple", hash); err != nil {
+		t.Fatalf("verify password: %v", err)
+	}
+}
+
+func TestBcryptHasherVerifyPasswordFailures(t *testing.T) {
+	t.Parallel()
+
+	hasher, err := password.NewBcryptHasher(bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("create hasher: %v", err)
+	}
+
+	hashValue, err := hasher.HashPassword(context.Background(), "correct horse battery staple")
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+
+	hash, err := valueobject.NewPasswordHash(hashValue)
+	if err != nil {
+		t.Fatalf("create password hash: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		ctx       context.Context
+		plaintext string
+		wantErr   error
+	}{
+		{
+			name:      "password mismatch",
+			ctx:       context.Background(),
+			plaintext: "wrong password",
+			wantErr:   password.ErrPasswordMismatch,
+		},
+		{
+			name:      "canceled context",
+			ctx:       canceledContext(),
+			plaintext: "correct horse battery staple",
+			wantErr:   context.Canceled,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := hasher.VerifyPassword(tt.ctx, tt.plaintext, hash)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func canceledContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	return ctx
 }
