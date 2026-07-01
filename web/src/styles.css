@@ -190,6 +190,37 @@ h2 {
   color: #203629;
 }
 
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 18px;
+  border: 1px solid #d4dfd8;
+  border-radius: 8px;
+  background: #eef4f0;
+}
+
+.segmented button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  color: #4a5b51;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.segmented button.selected {
+  color: #163322;
+  background: #ffffff;
+  box-shadow: 0 1px 6px rgba(35, 54, 42, 0.12);
+}
+
 .form {
   display: grid;
   gap: 16px;
@@ -249,6 +280,11 @@ input:focus {
 .result.danger {
   color: #7b271f;
   background: #fff0ed;
+}
+
+.tokenResult dd {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.9rem;
 }
 
 dl {

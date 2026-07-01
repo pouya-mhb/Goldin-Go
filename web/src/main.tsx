@@ -1,6 +1,14 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { Activity, CheckCircle2, CircleAlert, Loader2, ShieldCheck, UserPlus } from "lucide-react";
+import {
+  Activity,
+  CheckCircle2,
+  CircleAlert,
+  KeyRound,
+  Loader2,
+  ShieldCheck,
+  UserPlus
+} from "lucide-react";
 import "./styles.css";
 
 type ApiStatus = "checking" | "online" | "offline";
@@ -11,18 +19,35 @@ type RegistrationResponse = {
   registered_at: string;
 };
 
+type LoginResponse = {
+  user_id: string;
+  email: string;
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  access_token_expires_in: number;
+  refresh_token_expires_in: number;
+};
+
 type ErrorResponse = {
   error: string;
   message: string;
 };
 
+type IdentityMode = "register" | "login";
+
 function App() {
   const [apiStatus, setApiStatus] = React.useState<ApiStatus>("checking");
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [result, setResult] = React.useState<RegistrationResponse | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [mode, setMode] = React.useState<IdentityMode>("register");
+  const [registrationEmail, setRegistrationEmail] = React.useState("");
+  const [registrationPassword, setRegistrationPassword] = React.useState("");
+  const [loginEmail, setLoginEmail] = React.useState("");
+  const [loginPassword, setLoginPassword] = React.useState("");
+  const [isRegistering, setIsRegistering] = React.useState(false);
+  const [isLoggingIn, setIsLoggingIn] = React.useState(false);
+  const [registrationResult, setRegistrationResult] = React.useState<RegistrationResponse | null>(null);
+  const [loginResult, setLoginResult] = React.useState<LoginResponse | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
 
   const checkHealth = React.useCallback(async () => {
     setApiStatus("checking");
@@ -41,9 +66,9 @@ function App() {
 
   async function submitRegistration(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    setResult(null);
+    setIsRegistering(true);
+    setNotice(null);
+    setRegistrationResult(null);
 
     try {
       const response = await fetch("/identity/register", {
@@ -51,23 +76,57 @@ function App() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: registrationEmail, password: registrationPassword })
       });
 
       const payload = (await response.json()) as RegistrationResponse | ErrorResponse;
 
       if (!response.ok) {
         const message = "message" in payload ? payload.message : "Registration failed";
-        setError(message);
+        setNotice(message);
         return;
       }
 
-      setResult(payload as RegistrationResponse);
-      setPassword("");
+      const registeredUser = payload as RegistrationResponse;
+      setRegistrationResult(registeredUser);
+      setLoginEmail(registeredUser.email);
+      setRegistrationPassword("");
     } catch {
-      setError("The API is unreachable.");
+      setNotice("The API is unreachable.");
     } finally {
-      setIsSubmitting(false);
+      setIsRegistering(false);
+    }
+  }
+
+  async function submitLogin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsLoggingIn(true);
+    setNotice(null);
+    setLoginResult(null);
+
+    try {
+      const response = await fetch("/identity/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+      });
+
+      const payload = (await response.json()) as LoginResponse | ErrorResponse;
+
+      if (!response.ok) {
+        const message = "message" in payload ? payload.message : "Login failed";
+        setNotice(message);
+        return;
+      }
+
+      setLoginResult(payload as LoginResponse);
+      setLoginPassword("");
+    } catch {
+      setNotice("The API is unreachable.");
+    } finally {
+      setIsLoggingIn(false);
     }
   }
 
@@ -99,7 +158,7 @@ function App() {
           <header className="topbar">
             <div>
               <p className="eyebrow">Identity</p>
-              <h1>User registration</h1>
+              <h1>Identity access</h1>
             </div>
             <button className={`statusButton ${apiStatus}`} type="button" onClick={checkHealth}>
               {apiStatus === "checking" && <Loader2 className="spin" size={18} />}
@@ -113,79 +172,157 @@ function App() {
             <section className="panel" id="identity">
               <div className="panelHeader">
                 <ShieldCheck size={20} />
-                <h2>Create identity account</h2>
+                <h2>{mode === "register" ? "Create identity account" : "Authenticate user"}</h2>
               </div>
 
-              <form className="form" onSubmit={submitRegistration}>
-                <label>
-                  <span>Email</span>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    autoComplete="email"
-                    placeholder="user@example.com"
-                    required
-                  />
-                </label>
-
-                <label>
-                  <span>Password</span>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    autoComplete="new-password"
-                    minLength={12}
-                    placeholder="At least 12 characters"
-                    required
-                  />
-                </label>
-
-                <button className="primaryButton" type="submit" disabled={isSubmitting || apiStatus !== "online"}>
-                  {isSubmitting ? <Loader2 className="spin" size={18} /> : <UserPlus size={18} />}
-                  <span>{isSubmitting ? "Creating account" : "Create account"}</span>
+              <div className="segmented" role="tablist" aria-label="Identity actions">
+                <button
+                  className={mode === "register" ? "selected" : ""}
+                  type="button"
+                  onClick={() => setMode("register")}
+                >
+                  <UserPlus size={17} />
+                  Register
                 </button>
-              </form>
+                <button className={mode === "login" ? "selected" : ""} type="button" onClick={() => setMode("login")}>
+                  <KeyRound size={17} />
+                  Login
+                </button>
+              </div>
+
+              {mode === "register" && (
+                <form className="form" onSubmit={submitRegistration}>
+                  <label>
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      value={registrationEmail}
+                      onChange={(event) => setRegistrationEmail(event.target.value)}
+                      autoComplete="email"
+                      placeholder="user@example.com"
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    <span>Password</span>
+                    <input
+                      type="password"
+                      value={registrationPassword}
+                      onChange={(event) => setRegistrationPassword(event.target.value)}
+                      autoComplete="new-password"
+                      minLength={12}
+                      placeholder="At least 12 characters"
+                      required
+                    />
+                  </label>
+
+                  <button className="primaryButton" type="submit" disabled={isRegistering || apiStatus !== "online"}>
+                    {isRegistering ? <Loader2 className="spin" size={18} /> : <UserPlus size={18} />}
+                    <span>{isRegistering ? "Creating account" : "Create account"}</span>
+                  </button>
+                </form>
+              )}
+
+              {mode === "login" && (
+                <form className="form" onSubmit={submitLogin}>
+                  <label>
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      value={loginEmail}
+                      onChange={(event) => setLoginEmail(event.target.value)}
+                      autoComplete="email"
+                      placeholder="user@example.com"
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    <span>Password</span>
+                    <input
+                      type="password"
+                      value={loginPassword}
+                      onChange={(event) => setLoginPassword(event.target.value)}
+                      autoComplete="current-password"
+                      placeholder="Account password"
+                      required
+                    />
+                  </label>
+
+                  <button className="primaryButton" type="submit" disabled={isLoggingIn || apiStatus !== "online"}>
+                    {isLoggingIn ? <Loader2 className="spin" size={18} /> : <KeyRound size={18} />}
+                    <span>{isLoggingIn ? "Authenticating" : "Login"}</span>
+                  </button>
+                </form>
+              )}
             </section>
 
             <section className="panel detailPanel" aria-live="polite">
               <div className="panelHeader">
                 <Activity size={20} />
-                <h2>Registration result</h2>
+                <h2>{loginResult ? "Authenticated session" : "Identity result"}</h2>
               </div>
 
-              {result && (
-                <div className="result success">
+              {loginResult && (
+                <div className="result success tokenResult">
                   <CheckCircle2 size={22} />
                   <dl>
                     <div>
                       <dt>User ID</dt>
-                      <dd>{result.user_id}</dd>
+                      <dd>{loginResult.user_id}</dd>
                     </div>
                     <div>
                       <dt>Email</dt>
-                      <dd>{result.email}</dd>
+                      <dd>{loginResult.email}</dd>
                     </div>
                     <div>
-                      <dt>Registered</dt>
-                      <dd>{formatDate(result.registered_at)}</dd>
+                      <dt>Access token</dt>
+                      <dd>{compactToken(loginResult.access_token)}</dd>
+                    </div>
+                    <div>
+                      <dt>Refresh token</dt>
+                      <dd>{compactToken(loginResult.refresh_token)}</dd>
+                    </div>
+                    <div>
+                      <dt>Access expires</dt>
+                      <dd>{formatDuration(loginResult.access_token_expires_in)}</dd>
                     </div>
                   </dl>
                 </div>
               )}
 
-              {error && (
-                <div className="result danger">
-                  <CircleAlert size={22} />
-                  <p>{error}</p>
+              {!loginResult && registrationResult && (
+                <div className="result success">
+                  <CheckCircle2 size={22} />
+                  <dl>
+                    <div>
+                      <dt>User ID</dt>
+                      <dd>{registrationResult.user_id}</dd>
+                    </div>
+                    <div>
+                      <dt>Email</dt>
+                      <dd>{registrationResult.email}</dd>
+                    </div>
+                    <div>
+                      <dt>Registered</dt>
+                      <dd>{formatDate(registrationResult.registered_at)}</dd>
+                    </div>
+                  </dl>
                 </div>
               )}
 
-              {!result && !error && (
+              {notice && (
+                <div className="result danger">
+                  <CircleAlert size={22} />
+                  <p>{notice}</p>
+                </div>
+              )}
+
+              {!registrationResult && !loginResult && !notice && (
                 <div className="emptyState">
                   <ShieldCheck size={28} />
-                  <p>No registration submitted yet.</p>
+                  <p>No identity action submitted yet.</p>
                 </div>
               )}
             </section>
@@ -217,6 +354,28 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+function formatDuration(seconds: number) {
+  if (seconds < 60) {
+    return `${seconds} seconds`;
+  }
+
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes} minutes`;
+  }
+
+  const hours = Math.round(minutes / 60);
+  return `${hours} hours`;
+}
+
+function compactToken(token: string) {
+  if (token.length <= 24) {
+    return token;
+  }
+
+  return `${token.slice(0, 14)}...${token.slice(-10)}`;
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
