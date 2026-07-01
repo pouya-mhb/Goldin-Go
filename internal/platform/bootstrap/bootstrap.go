@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pouya-mhb/Goldin-Go/internal/identity"
 	"github.com/pouya-mhb/Goldin-Go/internal/platform/config"
 	"github.com/pouya-mhb/Goldin-Go/internal/platform/database"
 	platformhttp "github.com/pouya-mhb/Goldin-Go/internal/platform/http"
@@ -28,6 +29,11 @@ func Build() (*App, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
+	identityModule, err := identity.NewModule(db)
+	if err != nil {
+		return nil, fmt.Errorf("build identity module: %w", err)
+	}
+
 	router := platformhttp.NewRouter(log)
 	httpServer := platformhttp.New(cfg.Server, log, router)
 
@@ -37,6 +43,9 @@ func Build() (*App, error) {
 			Logger: log,
 			DB:     db,
 			HTTP:   httpServer,
+		},
+		Modules: &Modules{
+			Identity: identityModule,
 		},
 	}
 

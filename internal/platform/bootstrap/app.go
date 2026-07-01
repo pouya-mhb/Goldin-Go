@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/pouya-mhb/Goldin-Go/internal/identity"
 	"github.com/pouya-mhb/Goldin-Go/internal/platform/config"
 	platformhttp "github.com/pouya-mhb/Goldin-Go/internal/platform/http"
 )
@@ -18,7 +19,8 @@ import (
 type App struct {
 	Config *config.Config
 
-	Infra *Infrastructure
+	Infra   *Infrastructure
+	Modules *Modules
 }
 
 // Infrastructure contains shared infrastructure services.
@@ -30,6 +32,11 @@ type Infrastructure struct {
 	// Redis  *redis.Client
 	// Kafka  *kafka.Writer
 	// Tracer trace.TracerProvider
+}
+
+// Modules contains bounded context modules.
+type Modules struct {
+	Identity *identity.Module
 }
 
 // Run starts the application and blocks until the context is canceled.
