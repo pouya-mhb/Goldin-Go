@@ -21,13 +21,19 @@ var (
 type LoginService struct {
 	users     outbound.UserRepository
 	passwords outbound.PasswordVerifier
+	tokens    outbound.TokenIssuer
 }
 
 // NewLoginService constructs a LoginService.
-func NewLoginService(users outbound.UserRepository, passwords outbound.PasswordVerifier) *LoginService {
+func NewLoginService(
+	users outbound.UserRepository,
+	passwords outbound.PasswordVerifier,
+	tokens outbound.TokenIssuer,
+) *LoginService {
 	return &LoginService{
 		users:     users,
 		passwords: passwords,
+		tokens:    tokens,
 	}
 }
 
@@ -55,8 +61,18 @@ func (s *LoginService) LoginUser(ctx context.Context, cmd command.LoginUser) (re
 		return result.LoginUser{}, ErrInvalidCredentials
 	}
 
+	issuedTokens, err := s.tokens.IssueTokens(ctx, user.ID(), user.Email())
+	if err != nil {
+		return result.LoginUser{}, fmt.Errorf("issue login tokens: %w", err)
+	}
+
 	return result.LoginUser{
-		UserID: user.ID().String(),
-		Email:  user.Email().String(),
+		UserID:                user.ID().String(),
+		Email:                 user.Email().String(),
+		AccessToken:           issuedTokens.AccessToken,
+		RefreshToken:          issuedTokens.RefreshToken,
+		TokenType:             issuedTokens.TokenType,
+		AccessTokenExpiresIn:  issuedTokens.AccessTokenExpiresIn,
+		RefreshTokenExpiresIn: issuedTokens.RefreshTokenExpiresIn,
 	}, nil
 }

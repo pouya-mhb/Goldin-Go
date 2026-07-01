@@ -8,6 +8,7 @@ import (
 
 	"github.com/pouya-mhb/Goldin-Go/internal/identity/adapters/persistence"
 	"github.com/pouya-mhb/Goldin-Go/internal/identity/application/command"
+	"github.com/pouya-mhb/Goldin-Go/internal/identity/application/ports/outbound"
 	"github.com/pouya-mhb/Goldin-Go/internal/identity/application/service"
 	"github.com/pouya-mhb/Goldin-Go/internal/identity/domain"
 	"github.com/pouya-mhb/Goldin-Go/internal/identity/domain/valueobject"
@@ -19,7 +20,14 @@ func TestLoginServiceLoginUser(t *testing.T) {
 	user := mustUser(t)
 	users := &fakeLoginUserRepository{user: user}
 	passwords := &fakePasswordVerifier{}
-	login := service.NewLoginService(users, passwords)
+	tokens := &fakeTokenIssuer{
+		accessToken:           "access-token",
+		refreshToken:          "refresh-token",
+		tokenType:             "Bearer",
+		accessTokenExpiresIn:  900,
+		refreshTokenExpiresIn: 2592000,
+	}
+	login := service.NewLoginService(users, passwords, tokens)
 
 	result, err := login.LoginUser(context.Background(), command.LoginUser{
 		Email:    " USER@Example.COM ",
@@ -49,6 +57,18 @@ func TestLoginServiceLoginUser(t *testing.T) {
 	if passwords.hash != user.PasswordHash() {
 		t.Fatal("expected stored password hash to be passed to verifier")
 	}
+
+	if tokens.userID != user.ID() {
+		t.Fatal("expected token issuer to receive user id")
+	}
+
+	if result.AccessToken != "access-token" {
+		t.Fatalf("expected access token, got %q", result.AccessToken)
+	}
+
+	if result.RefreshToken != "refresh-token" {
+		t.Fatalf("expected refresh token, got %q", result.RefreshToken)
+	}
 }
 
 func TestLoginServiceLoginUserFailures(t *testing.T) {
@@ -56,12 +76,14 @@ func TestLoginServiceLoginUserFailures(t *testing.T) {
 
 	repositoryErr := errors.New("repository unavailable")
 	verifierErr := errors.New("password mismatch")
+	tokenErr := errors.New("token issuer unavailable")
 
 	tests := []struct {
 		name      string
 		command   command.LoginUser
 		users     *fakeLoginUserRepository
 		passwords *fakePasswordVerifier
+		tokens    *fakeTokenIssuer
 		wantErr   error
 	}{
 		{
@@ -72,6 +94,7 @@ func TestLoginServiceLoginUserFailures(t *testing.T) {
 			},
 			users:     &fakeLoginUserRepository{},
 			passwords: &fakePasswordVerifier{},
+			tokens:    &fakeTokenIssuer{},
 			wantErr:   service.ErrInvalidCredentials,
 		},
 		{
@@ -82,6 +105,7 @@ func TestLoginServiceLoginUserFailures(t *testing.T) {
 			},
 			users:     &fakeLoginUserRepository{err: persistence.ErrUserNotFound},
 			passwords: &fakePasswordVerifier{},
+			tokens:    &fakeTokenIssuer{},
 			wantErr:   service.ErrInvalidCredentials,
 		},
 		{
@@ -92,6 +116,7 @@ func TestLoginServiceLoginUserFailures(t *testing.T) {
 			},
 			users:     &fakeLoginUserRepository{err: repositoryErr},
 			passwords: &fakePasswordVerifier{},
+			tokens:    &fakeTokenIssuer{},
 			wantErr:   repositoryErr,
 		},
 		{
@@ -102,7 +127,19 @@ func TestLoginServiceLoginUserFailures(t *testing.T) {
 			},
 			users:     &fakeLoginUserRepository{user: mustUser(t)},
 			passwords: &fakePasswordVerifier{err: verifierErr},
+			tokens:    &fakeTokenIssuer{},
 			wantErr:   service.ErrInvalidCredentials,
+		},
+		{
+			name: "token issuer failure",
+			command: command.LoginUser{
+				Email:    "user@example.com",
+				Password: "correct horse battery staple",
+			},
+			users:     &fakeLoginUserRepository{user: mustUser(t)},
+			passwords: &fakePasswordVerifier{},
+			tokens:    &fakeTokenIssuer{err: tokenErr},
+			wantErr:   tokenErr,
 		},
 	}
 
@@ -110,7 +147,7 @@ func TestLoginServiceLoginUserFailures(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			login := service.NewLoginService(tt.users, tt.passwords)
+			login := service.NewLoginService(tt.users, tt.passwords, tt.tokens)
 
 			_, err := login.LoginUser(context.Background(), tt.command)
 
@@ -127,7 +164,7 @@ func TestLoginServiceLoginUserHonorsCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	login := service.NewLoginService(&fakeLoginUserRepository{}, &fakePasswordVerifier{})
+	login := service.NewLoginService(&fakeLoginUserRepository{}, &fakePasswordVerifier{}, &fakeTokenIssuer{})
 
 	_, err := login.LoginUser(ctx, command.LoginUser{
 		Email:    "user@example.com",
@@ -175,6 +212,34 @@ type fakePasswordVerifier struct {
 	err       error
 	plaintext string
 	hash      valueobject.PasswordHash
+}
+
+type fakeTokenIssuer struct {
+	err                   error
+	userID                valueobject.UserID
+	email                 valueobject.Email
+	accessToken           string
+	refreshToken          string
+	tokenType             string
+	accessTokenExpiresIn  int64
+	refreshTokenExpiresIn int64
+}
+
+func (i *fakeTokenIssuer) IssueTokens(ctx context.Context, userID valueobject.UserID, email valueobject.Email) (outbound.IssuedTokens, error) {
+	if err := ctx.Err(); err != nil {
+		return outbound.IssuedTokens{}, err
+	}
+
+	i.userID = userID
+	i.email = email
+
+	return outbound.IssuedTokens{
+		AccessToken:           i.accessToken,
+		RefreshToken:          i.refreshToken,
+		TokenType:             i.tokenType,
+		AccessTokenExpiresIn:  i.accessTokenExpiresIn,
+		RefreshTokenExpiresIn: i.refreshTokenExpiresIn,
+	}, i.err
 }
 
 func (v *fakePasswordVerifier) VerifyPassword(ctx context.Context, plaintext string, hash valueobject.PasswordHash) error {

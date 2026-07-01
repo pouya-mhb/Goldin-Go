@@ -30,7 +30,7 @@ func Build() (*App, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	identityModule, err := identity.NewModule(db)
+	identityModule, err := identity.NewModule(db, cfg.JWT)
 	if err != nil {
 		return nil, fmt.Errorf("build identity module: %w", err)
 	}
