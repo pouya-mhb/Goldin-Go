@@ -41,3 +41,11 @@ tmp/
 
 # Vendor (if not committed)
 vendor/
+
+# Frontend dependencies and build output
+node_modules/
+web/dist/
+web/*.log
+web/*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
